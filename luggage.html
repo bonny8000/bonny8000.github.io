@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行李整理助手</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        #form {
+            margin-bottom: 20px;
+        }
+        #form input, #form select {
+            margin-right: 10px;
+        }
+        #luggageTable {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #luggageTable th, #luggageTable td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        #luggageTable th {
+            background-color: #f2f2f2;
+            text-align: left;
+        }
+        #message {
+            color: red;
+        }
+        .button-group button {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>行李整理助手</h1>
+
+    <div id="form">
+        <input type="text" id="bagName" placeholder="行李袋名稱">
+        <button onclick="addBag()">添加行李袋</button>
+        <br><br>
+        <select id="bagSelect">
+            <option value="">選擇行李袋</option>
+        </select>
+        <input type="text" id="item" placeholder="項目名稱">
+        <input type="number" id="quantity" placeholder="數量">
+        <button onclick="addItem()">添加項目</button>
+        <p id="message"></p>
+    </div>
+
+    <table id="luggageTable">
+        <thead>
+            <tr>
+                <th>行李袋名稱</th>
+                <th>項目名稱</th>
+                <th>數量</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="luggageContent">
+        </tbody>
+    </table>
+
+    <button onclick="exportLuggage()">輸出行李清单</button>
+
+    <script>
+        let luggage = JSON.parse(localStorage.getItem('luggage')) || {};
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateTable();
+            updateBagSelect();
+        });
+
+        function addBag() {
+            const bagName = document.getElementById('bagName').value.trim();
+            const message = document.getElementById('message');
+
+            if (bagName === "") {
+                message.textContent = "請填寫行李袋名稱。";
+                return;
+            }
+
+            if (luggage[bagName]) {
+                message.textContent = "此行李袋已存在。";
+            } else {
+                luggage[bagName] = {};
+                message.textContent = "";
+                updateTable();
+                updateBagSelect();
+                saveToLocalStorage();
+            }
+
+            document.getElementById('bagName').value = "";
+        }
+
+        function addItem() {
+            const bagName = document.getElementById('bagSelect').value;
+            const item = document.getElementById('item').value.trim();
+            const quantity = document.getElementById('quantity').value.trim();
+            const message = document.getElementById('message');
+
+            if (bagName === "") {
+                message.textContent = "請選擇行李袋。";
+                return;
+            }
+            if (item === "" || quantity === "") {
+                message.textContent = "請填寫完整的項目名稱和數量。";
+                return;
+            }
+
+            if (luggage[bagName][item]) {
+                message.textContent = "此項目在該行李袋中已存在，請更改名稱或更新數量。";
+            } else {
+                luggage[bagName][item] = quantity;
+                message.textContent = "";
+                updateTable();
+                saveToLocalStorage();
+            }
+
+            document.getElementById('item').value = "";
+            document.getElementById('quantity').value = "";
+        }
+
+        function updateTable() {
+            const luggageContent = document.getElementById('luggageContent');
+            luggageContent.innerHTML = "";
+
+            for (const bagName in luggage) {
+                for (const item in luggage[bagName]) {
+                    const row = luggageContent.insertRow();
+                    const cellBag = row.insertCell(0);
+                    const cellItem = row.insertCell(1);
+                    const cellQuantity = row.insertCell(2);
+                    const cellActions = row.insertCell(3);
+
+                    cellBag.textContent = bagName;
+                    cellItem.textContent = item;
+                    cellQuantity.textContent = luggage[bagName][item];
+
+                    const buttonGroup = document.createElement('div');
+                    buttonGroup.className = 'button-group';
+
+                    const editButton = document.createElement('button');
+                    editButton.textContent = '编辑';
+                    editButton.onclick = () => editItem(bagName, item);
+
+                    const deleteButton = document.createElement('button');
+                    deleteButton.textContent = '删除';
+                    deleteButton.onclick = () => deleteItem(bagName, item);
+
+                    buttonGroup.appendChild(editButton);
+                    buttonGroup.appendChild(deleteButton);
+
+                    cellActions.appendChild(buttonGroup);
+                }
+            }
+        }
+
+        function updateBagSelect() {
+            const bagSelect = document.getElementById('bagSelect');
+            bagSelect.innerHTML = '<option value="">選擇行李袋</option>';
+
+            for (const bagName in luggage) {
+                const option = document.createElement('option');
+                option.value = bagName;
+                option.textContent = bagName;
+                bagSelect.appendChild(option);
+            }
+        }
+
+        function editItem(bagName, item) {
+            const newQuantity = prompt(`请输入新的数量为 ${item} 在 ${bagName}:`, luggage[bagName][item]);
+            if (newQuantity !== null) {
+                luggage[bagName][item] = newQuantity;
+                updateTable();
+                saveToLocalStorage();
+            }
+        }
+
+        function deleteItem(bagName, item) {
+            delete luggage[bagName][item];
+            updateTable();
+            saveToLocalStorage();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('luggage', JSON.stringify(luggage));
+        }
+
+        function exportLuggage() {
+            let luggageText = '';
+            for (const bagName in luggage) {
+                luggageText += `行李袋: ${bagName}\n`;
+                for (const item in luggage[bagName]) {
+                    luggageText += `  ${item}: ${luggage[bagName][item]}\n`;
+                }
+            }
+            const blob = new Blob([luggageText], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'luggage_list.txt';
+            link.click();
+        }
+    </script>
+    
+</body>
+</html>
